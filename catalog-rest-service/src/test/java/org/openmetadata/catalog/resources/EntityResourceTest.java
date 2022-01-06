@@ -46,6 +46,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -58,6 +59,7 @@ import java.util.UUID;
 import java.util.function.BiConsumer;
 import javax.json.JsonPatch;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.http.client.HttpResponseException;
 import org.junit.jupiter.api.AfterAll;
@@ -776,6 +778,26 @@ public abstract class EntityResourceTest<T> extends CatalogApplicationTest {
     HttpResponseException exception =
         assertThrows(HttpResponseException.class, () -> deleteEntity(NON_EXISTENT_ENTITY, adminAuthHeaders()));
     assertResponse(exception, NOT_FOUND, entityNotFound(entityName, NON_EXISTENT_ENTITY));
+  }
+
+  @Test
+  void delete_put_Entity_200(TestInfo test) throws URISyntaxException, IOException {
+    Object request = createRequest(getEntityName(test), "", null, null);
+    T entity = createEntity(request, adminAuthHeaders());
+    EntityInterface<T> entityInterface = getEntityInterface(entity);
+
+    // Delete
+    deleteEntity(entityInterface.getId(), adminAuthHeaders());
+
+    ChangeDescription change = getChangeDescription(entityInterface.getVersion());
+    change.setFieldsUpdated(
+        Arrays.asList(
+            new FieldChange().withName("deleted").withNewValue(false).withOldValue(true),
+            new FieldChange().withName("description").withNewValue("updatedDescription").withOldValue("")));
+
+    // PUT with updated description
+    Object updatedRequest = createRequest(getEntityName(test), "updatedDescription", null, null);
+    updateAndCheckEntity(updatedRequest, Response.Status.OK, adminAuthHeaders(), MINOR_UPDATE, change);
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
